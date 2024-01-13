@@ -2,30 +2,159 @@
 <html>
 
 <head>
-    <title>ESP IOT DASHBOARD</title>
+    <title>VTM</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="stylesheet" type="text/css" href="style.css">
+    <meta charset="UTF-8">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
 </head>
+<link rel="stylesheet" type="text/css" href="style.css">
 
 <body>
-    <div class="topnav">
-        <h1>NFR24: Vehicle Tuning and Monitoring Tool</h1>
-    </div>
-    <div class="content">
-        <div class="card-grid">
-            <div class="card">
-                <p class="card-title"> VCU</p>
-            </div>
-            <div class="card">
-                <p class="card-title"> Inverter</p>
-            </div>
-            <div class="card">
-                <p class="card-title"> Status</p>
-            </div>
+    <div class="container">
+        <h1>NFR24 Vehicle Tuning and Monitoring Interface</h1>
+        <div id="table" class="table-editable">
+            <h2>Inverter Temp-Amp Lookup Table</h2>
+            <table class="table" id="inverter-temp-amp">
+                <tr>
+                    <th> Inverter Temp</th>
+                    <th> Inverter Amps </th>
+                </tr>
+                <!-- <tr>
+                    <td contenteditable="true" class="editor" id="yaur"> 1 </td>
+                    <td contenteditable="true" class="editor"> 1 </td>
+                </tr>
+                <tr>
+                    <td contenteditable="true" class="editor"> 2 </td>
+                    <td contenteditable="true"> 10 </td>
+                </tr>
+                <tr>
+                    <td contenteditable="true"> 3 </td>
+                    <td contenteditable="true"> 8 </td>
+                </tr>
+                <tr>
+                    <td contenteditable="true"> 4 </td>
+                    <td contenteditable="true"> 3 </td>
+                </tr> -->
+            </table>
+        </div>
+        <div id="table" class="table-editable">
+            <h2>Motor Temp-Amp Lookup Table</h2>
+            <table class="table" id="motor-temp-amp">
+                <tr>
+                    <th> Motor Temp</th>
+                    <th> Motor Amps </th>
+                </tr>
+            </table>
         </div>
     </div>
-    <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"> </script>
+    <!-- <script src="script.js"></script> -->
+    <script>
+
+        function save() {
+            var table = document.getElementById("table");
+            var rows = table.getElementsByTagName("tr");
+            var data = [];
+            for (var i = 0; i < rows.length; i++) {
+                var row = [],
+                    cols = rows[i].querySelectorAll("td, th");
+                for (var j = 0; j < cols.length; j++)
+                    row.push(cols[j].innerHTML);
+                data.push(row);
+            }
+            console.log(data);
+        }
+
+        data = {
+            "inverter-temp-amp": {
+                "1": [1, 1],
+                "2": [2, 10],
+                "3": [3, 8]
+            },
+            "motor-temp-amp": {
+                "1": [1, 1],
+                "2": [2, 10],
+                "3": [3, 8],
+                "4": [4, 3]
+            }
+        };
+
+        function populateTables(data) {
+            // for each table
+            for (const [key, value] of Object.entries(data)) {
+                let table = document.getElementById(key);
+                // for each row
+                for (const [row_key, row_value] of Object.entries(value)) {
+                    let tr = document.createElement('tr');
+                    for (const [col_key, col_value] of Object.entries(row_value)) {
+                        let td = document.createElement('td');
+                        td.innerHTML = col_value;
+                        td.contentEditable = true;
+                        td.className = "editor";
+                        td.id = key + "-" + row_key + "-" + col_key;
+                        tr.appendChild(td);
+                    }
+                    table.appendChild(tr);
+                }
+            }
+
+            elements = document.getElementsByClassName("editor")
+            for (var i = 0; i < elements.length; i++) {
+                elements[i].addEventListener("input", function () {
+                    console.log(this.id);
+                    console.log(this.innerHTML);
+                }, false);
+            }
+        }
+        populateTables(data);
+
+        var gateway = "ws://192.168.4.1/ws";
+        var websocket;
+        // Init web socket when the page loads
+        window.addEventListener('load', onload);
+
+        function onload(event) {
+            initWebSocket();
+        }
+
+        function getReadings() {
+            websocket.send("getReadings");
+        }
+
+        function initWebSocket() {
+            console.log('Trying to open a WebSocket connection…');
+            websocket = new WebSocket(gateway);
+            websocket.onopen = onOpen;
+            websocket.onclose = onClose;
+            websocket.onmessage = onMessage;
+        }
+
+        // When websocket is established, call the getReadings() function
+        function onOpen(event) {
+            console.log('Connection opened');
+            getReadings();
+        }
+
+        function onClose(event) {
+            console.log('Connection closed');
+            setTimeout(initWebSocket, 2000);
+        }
+
+        // Function that receives the message from the ESP32 with the readings
+        function onMessage(event) {
+            console.log(event.data);
+            var myObj = JSON.parse(event.data);
+            var keys = Object.keys(myObj);
+
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                document.getElementById(key).innerHTML = myObj[key];
+            }
+        }
+    </script>
 </body>
 
+
 </html>
+<! DOCTYPE html>

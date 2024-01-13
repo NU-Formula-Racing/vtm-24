@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include "virtualTimer.h"
 #include "esp_can.h"
+#include "vtm.h"
 
 const byte DNS_PORT = 53;
 const char *ssid = "FormulaVTM";
@@ -13,11 +14,17 @@ const char *password = "formulavtmpass";
 DNSServer dnsServer;
 
 AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
+AsyncWebSocket websocket("/ws");
 
 VirtualTimerGroup timer_group;
 
 ESPCAN can_interface{};
+
+VTM vtm{};
+
+// IPAddress local_ip(192, 168, 1, 1);
+// IPAddress gateway(192, 168, 1, 1);
+// IPAddress subnet(255, 255, 255, 0);
 
 void onRootRequest(AsyncWebServerRequest *request)
 {
@@ -29,6 +36,7 @@ void initWebServer()
     server.on("/", onRootRequest);
     server.serveStatic("/", SPIFFS, "/");
     server.begin();
+    Serial.println("HTTP server started");
 }
 
 void notifyClients()
@@ -36,7 +44,7 @@ void notifyClients()
     static StaticJsonDocument<10000> doc;
     static char data[10000];
     size_t len = serializeJson(doc, data);
-    ws.textAll(data, len);
+    websocket.textAll(data, len);
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
@@ -64,7 +72,7 @@ void onEvent(AsyncWebSocket *server,
              uint8_t *data,
              size_t len)
 {
-
+    Serial.print("on event");
     switch (type)
     {
     case WS_EVT_CONNECT:
@@ -74,23 +82,27 @@ void onEvent(AsyncWebSocket *server,
         Serial.printf("WebSocket client #%u disconnected\n", client->id());
         break;
     case WS_EVT_DATA:
+        Serial.printf("case WS_EVT_DATA\n");
         handleWebSocketMessage(arg, data, len);
         break;
     case WS_EVT_PONG:
+        Serial.printf("case WS_EVT_PONG\n");
+        break;
     case WS_EVT_ERROR:
+        Serial.printf("case WS_EVT_ERROR\n");
         break;
     }
 }
 
 void initWebSocket()
 {
-    ws.onEvent(onEvent);
-    server.addHandler(&ws);
+    websocket.onEvent(onEvent);
+    server.addHandler(&websocket);
 }
 
 void initSPIFFS()
 {
-    if (!SPIFFS.begin())
+    if (!SPIFFS.begin(true))
     {
         Serial.println("Cannot mount SPIFFS volume...");
     }
@@ -98,8 +110,14 @@ void initSPIFFS()
 
 void setup()
 {
-    Serial.begin(9600);
+    delay(100);
+    Serial.begin(115200);
+
+    WiFi.persistent(false);
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid, password);
+    Serial.println(WiFi.softAPIP());
     can_interface.Initialize(ICAN::BaudRate::kBaud1M);
     delay(100);
     initSPIFFS();
@@ -109,6 +127,7 @@ void setup()
     timer_group.AddTimer(100, notifyClients);
     timer_group.AddTimer(10, []()
                          { can_interface.Tick(); });
+    Serial.println("Setup complete!");
 }
 
 void loop()
